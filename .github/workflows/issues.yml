@@ -15,6 +15,9 @@ jobs:
         run: |
           echo "GITHUB_TOKEN=${{ secrets.SHEEP }}" >> $GITHUB_ENV
 
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
       - name: Handle labeled issues
         if: github.event.action == 'labeled'
         run: |
