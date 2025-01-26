@@ -12,8 +12,7 @@ jobs:
 
     steps:
       - name: Set up authentication
-        run: |
-          echo "GITHUB_TOKEN=${{ secrets.SHEEP }}" >> $GITHUB_ENV
+        run: echo "GITHUB_TOKEN=${{ secrets.SHEEP }}" >> $GITHUB_ENV
 
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
@@ -40,18 +39,14 @@ jobs:
         run: |
           existing_labels=$(curl -s -H "Authorization: token ${{ secrets.SHEEP }}" -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }} | jq -r '.labels | map(.name)')
           if [[ "${{ github.event.issue.state_reason }}" == "duplicate" ]]; then
-            new_labels=$(echo $existing_labels | jq -c '. + ["❌ 重复"]' | sed 's/[][]//g' | sed 's/"//g')
-            new_labels=$(echo $new_labels | sed 's/,/, /g')
-            new_labels='["'$(echo $new_labels | sed 's/ /","/g')'"]'
+            new_labels=$(echo $existing_labels | jq -c '. + ["❌ 重复"]' | jq -c '. | map(gsub("\\s+"; ""))')
             curl -X PATCH \
               -H "Authorization: token ${{ secrets.SHEEP }}" \
               -H "Accept: application/vnd.github.v3+json" \
               https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }} \
               -d '{"labels": '$new_labels'}'
           elif [[ "${{ github.event.issue.state_reason }}" == "completed" ]]; then
-            new_labels=$(echo $existing_labels | jq -c '. + ["👌 完成"]' | sed 's/[][]//g' | sed 's/"//g')
-            new_labels=$(echo $new_labels | sed 's/,/, /g')
-            new_labels='["'$(echo $new_labels | sed 's/ /","/g')'"]'
+            new_labels=$(echo $existing_labels | jq -c '. + ["👌 完成"]' | jq -c '. | map(gsub("\\s+"; ""))')
             curl -X PATCH \
               -H "Authorization: token ${{ secrets.SHEEP }}" \
               -H "Accept: application/vnd.github.v3+json" \
