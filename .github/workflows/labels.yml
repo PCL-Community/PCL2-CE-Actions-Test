@@ -11,7 +11,7 @@ jobs:
       - name: Check if the issue was closed as completed and add label
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.SHEEP }}
+          github-token: ${{ secrets.BOT }}
           script: |
             if (context.payload.issue.state_reason === 'completed') {
               await github.rest.issues.addLabels({
@@ -25,7 +25,7 @@ jobs:
       - name: Check if the issue was closed as duplicate and add label
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.SHEEP }}
+          github-token: ${{ secrets.BOT }}
           script: |
             if (context.payload.issue.state_reason === 'duplicate') {
               await github.rest.issues.addLabels({
