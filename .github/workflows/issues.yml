@@ -7,7 +7,7 @@ on:
       - closed
 
 jobs:
-  manage_issues:
+ manage_issues:
     runs-on: ubuntu-latest
 
     steps:
@@ -33,3 +33,34 @@ jobs:
               https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }} \
               -d '{"state": "closed", "state_reason": "completed"}'
           fi
+
+ add-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if the issue was closed as completed and add label
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.SHEEP }}
+          script: |
+            if (context.payload.issue.state_reason === 'completed') {
+              await github.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                labels: ['👌 完成']
+              });
+            }
+
+      - name: Check if the issue was closed as duplicate and add label
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.SHEEP }}
+          script: |
+            if (context.payload.issue.state_reason === 'duplicate') {
+              await github.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                labels: ['❌ 重复']
+              });
+            }
