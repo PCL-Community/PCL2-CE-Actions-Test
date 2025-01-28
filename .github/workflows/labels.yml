@@ -36,7 +36,7 @@ jobs:
               });
             }
         
-        - name: Check if the issue was closed as not planned and add label
+      - name: Check if the issue was closed as not planned and add label
           uses: actions/github-script@v6
           with:
             github-token: ${{ secrets.BOT }}
