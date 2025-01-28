@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Set up authentication
-        run: echo "GITHUB_TOKEN=${{ secrets.SHEEP }}" >> $GITHUB_ENV
+        run: echo "GITHUB_TOKEN=${{ secrets.BOT }}" >> $GITHUB_ENV
 
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
@@ -22,13 +22,13 @@ jobs:
         run: |
           if [[ "${{ github.event.label.name }}" == "❌ 拒绝" || "${{ github.event.label.name }}" == "😂 移交上游" ]]; then
             curl -X PATCH \
-              -H "Authorization: token ${{ secrets.SHEEP }}" \
+              -H "Authorization: token ${{ secrets.BOT }}" \
               -H "Accept: application/vnd.github.v3+json" \
               https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }} \
               -d '{"state": "closed", "state_reason": "not_planned"}'
           elif [[ "${{ github.event.label.name }}" == "👌 完成" ]]; then
             curl -X PATCH \
-              -H "Authorization: token ${{ secrets.SHEEP }}" \
+              -H "Authorization: token ${{ secrets.BOT }}" \
               -H "Accept: application/vnd.github.v3+json" \
               https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }} \
               -d '{"state": "closed", "state_reason": "completed"}'
