@@ -19,7 +19,7 @@ jobs:
       - name: Handle labeled issues
         if: github.event.action == 'labeled'
         run: |
-          if [[ "${{ github.event.label.name }}" == "❌ 拒绝" || "${{ github.event.label.name }}" == "😂 移交上游" || "${{ github.event.label.name }}" == "❌ 忽略" ]]; then
+          if [[ "${{ github.event.label.name }}" == "❌ 拒绝" || "${{ github.event.label.name }}" == "😂 移交上游" || "${{ github.event.label.name }}" == "❌ 忽略" || "${{ github.event.label.name }}" == "❌ 第三方" || "${{ github.event.label.name }}" == "❌ 暂无计划"]]; then
             curl -X PATCH \
               -H "Authorization: token ${{ secrets.BOT }}" \
               -H "Accept: application/vnd.github.v3+json" \
