@@ -33,15 +33,21 @@ jobs:
       fail-fast: false
 
     steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        repository: 'PCL-Community/PCL2-CE'
+
+    - name: CD ..
+      run: cd ..
+
     - name: Checkout Help
       uses: actions/checkout@v4
       with:
         repository: 'PCL-Community/PCL2CEHelp'
 
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        repository: 'PCL-Community/PCL2-CE'
+    - name: CD PCL
+      run: cd PCL2-CE-Actions-Test
 
     - name: Set Describe
       shell: bash
@@ -60,9 +66,7 @@ jobs:
     - name: Update Help
       run: |
         cd ..
-        cd ..
         dir
-        Set-Location ..
         Set-Location PCL2CEHelp
         Remove-Item -Path *.* -Recurse -Force
         Compress-Archive -Path .\* -DestinationPath .\Help.zip
