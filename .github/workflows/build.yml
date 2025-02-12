@@ -108,6 +108,7 @@ jobs:
         # Fetch the Pull Request details
         try {
           $pr_number = $env:GITHUB_EVENT_PULL_REQUEST_NUMBER
+          Write-Host "Fetching PR details for PR number: $pr_number"
           $response = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/pulls/$pr_number" `
                                         -Headers @{
                                           Authorization = "token $env:GITHUB_TOKEN"
@@ -128,6 +129,7 @@ jobs:
 
         # Check if release already exists
         try {
+          Write-Host "Checking if release with tag '$tag_name' already exists"
           $existing_release = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$([uri]::EscapeDataString($tag_name))" `
                                                -Headers @{
                                                  Authorization = "token $env:GITHUB_TOKEN"
@@ -136,6 +138,7 @@ jobs:
           Write-Host "Existing Release Details: $($existing_release | ConvertTo-Json -Depth 100)"
           # If release exists, update it
           $release_id = $existing_release.id
+          Write-Host "Updating existing release with ID: $release_id"
           $update_response = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/$release_id" `
                                               -Method Patch `
                                               -Body @{
@@ -149,6 +152,7 @@ jobs:
           Write-Host "Updated Release Details: $update_response"
         } catch {
           # If release does not exist, create a new one
+          Write-Host "Creating new release with tag '$tag_name'"
           $create_response = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases" `
                                               -Method Post `
                                               -Body @{
@@ -172,6 +176,7 @@ jobs:
           Authorization = "token $env:GITHUB_TOKEN"
           "Content-Type" = "application/octet-stream"
         }
+        Write-Host "Uploading asset to URI: $upload_uri"
         $upload_response = Invoke-RestMethod -Uri $upload_uri -Method Post -Headers $headers -InFile $asset_path
         Write-Host "Uploaded Asset Details: $($upload_response | ConvertTo-Json -Depth 100)"
 
