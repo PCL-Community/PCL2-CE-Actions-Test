@@ -1,48 +1,64 @@
-name: Beta Build and Release
+name: Build
 
 on:
-  push:
+  pull_request:
     branches:
       - beta
-    paths:
-      - 'Plain Craft Launcher 2/**'
-      - '.github/workflows/**'
+    types:
+      - closed
 
 jobs:
-  build-and-release:
-    name: Build and Release
-    runs-on: windows-latest
+  build:
+    name: Build ${{ matrix.configuration }}-${{ matrix.architecture }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - configuration: Beta
+            architecture: x64
+            os: windows-latest
+          - configuration: Release
+            architecture: x64
+            os: windows-latest
+          - configuration: Beta
+            architecture: ARM64
+            os: self-hosted
+          - configuration: Release
+            architecture: ARM64
+            os: self-hosted
+      fail-fast: false
+
     steps:
     - name: Checkout
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
 
     - name: Set Describe
-      shell: bash
+      shell: powershell
       run: |
-          describe=`git describe --tags --always`
+          $describe = $(git describe --tags --always)
           echo "describe=$describe" >> $GITHUB_ENV
-
-    - name: Restore NuGet Packages
-      run: nuget restore "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -PackagesDirectory "packages"
 
     - name: Setup MSBuild.exe
       uses: microsoft/setup-msbuild@v2
       with:
-        msbuild-architecture: x64
+        msbuild-architecture: ${{ matrix.architecture }}
 
     - name: Update Help
-      run:  |
-        Set-Location ..
-        git clone https://github.com/PCL-Community/PCL2CEHelp.git -b master --single-branch --depth 1
-        Set-Location PCL2CEHelp
-        Remove-Item -Path *.* -Recurse -Force
+      run: |
+        cd ..
+        git clone https://gh.llkk.cc/https://github.com/PCL-Community/PCL2CEHelp -b master --single-branch --depth 1
+        cd PCL2CEHelp
+        rm -Force -r *.*
         Compress-Archive -Path .\* -DestinationPath .\Help.zip
-        Copy-Item -Path .\Help.zip -Destination "..\PCL2-CE\Plain Craft Launcher 2\Resources\Help.zip" -Force
-        Set-Location ..\PCL2-CE
+        Copy-Item -Path .\Help.zip -Destination "${{ github.workspace }}\Plain Craft Launcher 2\Resources\Help.zip" -Force
+        cd ..
+        rm -Force -r .\PCL2CEHelp
+        cd ${{ GITHUB.WORKSPACE }}
 
-    - name: Replace
+    - name: Restore NuGet Packages
+      run: nuget restore "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -PackagesDirectory "packages"
+
+    - name: Replace Secrets and Commit Hash
       run: |
         (gc "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public Const OAuthClientId As String = ""', 'Public Const OAuthClientId As String = "${{ secrets.CLIENT_ID }}"' | Out-File "Plain Craft Launcher 2\Modules\ModSecret.vb"
         (gc "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public Const CurseForgeAPIKey As String = ""', 'Public Const CurseForgeAPIKey As String = "${{ secrets.CURSEFORGE_API_KEY }}"' | Out-File "Plain Craft Launcher 2\Modules\ModSecret.vb"
@@ -51,42 +67,61 @@ jobs:
         (gc "Plain Craft Launcher 2\Pages\PageOther\PageOtherAbout.xaml") -replace 'https://github.com/PCL-Community/PCL2-CE', 'https://github.com/PCL-Community/PCL2-CE/tree/${{ github.sha }}' | Out-File "Plain Craft Launcher 2\Pages\PageOther\PageOtherAbout.xaml"
 
     - name: Build
-      run: msbuild "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -p:Configuration=Beta
+      run: msbuild "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -p:Configuration=${{ matrix.configuration }} -p:Platform=${{ matrix.architecture }}
 
     - name: Upload a Build Artifact
+      id: upload-artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Beta ${{ env.describe }}
-        path: Plain Craft Launcher 2\obj\Beta\Plain Craft Launcher 2.exe
+        name: ${{ matrix.configuration }}-${{ matrix.architecture }}
+        path: Plain Craft Launcher 2\obj\${{ matrix.architecture }}\${{ matrix.configuration }}\Plain Craft Launcher 2.exe
 
-    - name: Get latest merged PR title and body
-      id: get_pr_info
+    - name: Create or Update Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.BOT }}
       run: |
-        pr_title=$(gh api -H github.com /repos/PCL-Community/PCL2-CE/pulls?state=closed&sort=updated&direction=desc&base=beta | jq -r '.[0].title')
-        pr_body=$(gh api -H github.com /repos/PCL-Community/PCL2-CE/pulls?state=closed&sort=updated&direction=desc&base=beta | jq -r '.[0].body')
-        echo "::set-output name=title::$pr_title"
-        echo "::set-output name=body::$pr_body"
-      env:
-        GITHUB_TOKEN: ${{ secrets.BOT }}
+        pr_number=${{ github.event.pull_request.number }}
+        response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+                         -H "Accept: application/vnd.github.v3+json" \
+                         https://api.github.com/repos/${{ github.repository }}/pulls/$pr_number)
 
-    - name: Create or update release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.BOT }}
-      with:
-        tag_name: Beta ${{ steps.get_pr_info.outputs.title }}
-        prerelease: true
-        name: ${{ steps.get_pr_info.outputs.title }}
-        body: ${{ steps.get_pr_info.outputs.body }}
+        pr_title=$(echo "$response" | jq -r '.title')
+        pr_body=$(echo "$response" | jq -r '.body')
 
-    - name: Upload Release Asset
-      id: upload-release-asset 
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.BOT }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: Plain Craft Launcher 2\obj\Beta\Plain Craft Launcher 2.exe
-        asset_name: Plain Craft Launcher 2.exe
-        asset_content_type: application/octet-stream
+        tag_name="Beta ${pr_title}"
+
+        # Check if release already exists
+        existing_release=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+                                 -H "Accept: application/vnd.github.v3+json" \
+                                 https://api.github.com/repos/${{ github.repository }}/releases/tags/"$tag_name")
+
+        if [ "$(echo "$existing_release" | jq -r '.message')" != "Not Found" ]; then
+          # If release exists, update it
+          release_id=$(echo "$existing_release" | jq -r '.id')
+          curl -X PATCH -H "Authorization: token $GITHUB_TOKEN" \
+                       -H "Accept: application/vnd.github.v3+json" \
+                       -d "{\"tag_name\": \"$tag_name\", \"target_commitish\": \"beta\", \"name\": \"$pr_title\", \"body\": \"$pr_body\", \"draft\": false, \"prerelease\": true}" \
+                       https://api.github.com/repos/${{ github.repository }}/releases/$release_id
+        else
+          # If release does not exist, create a new one
+          curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
+                        -H "Accept: application/vnd.github.v3+json" \
+                        -d "{\"tag_name\": \"$tag_name\", \"target_commitish\": \"beta\", \"name\": \"$pr_title\", \"body\": \"$pr_body\", \"draft\": false, \"prerelease\": true}" \
+                        https://api.github.com/repos/${{ github.repository }}/releases
+        fi
+
+        # Upload artifacts to the release
+        release_id=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+                             -H "Accept: application/vnd.github.v3+json" \
+                             https://api.github.com/repos/${{ github.repository }}/releases/tags/"$tag_name" | jq -r '.id')
+
+        asset_path="${{ runner.temp }}/artifact.zip"
+        zip -j "$asset_path" Plain Craft Launcher 2\obj\${{ matrix.architecture }}\${{ matrix.configuration }}\Plain Craft Launcher 2.exe
+
+        curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
+                     -H "Content-Type: application/octet-stream" \
+                     --data-binary @"$asset_path" \
+                     "https://uploads.github.com/repos/${{ github.repository }}/releases/$release_id/assets?name=${{ matrix.configuration }}-${{ matrix.architecture }}.zip"
+
+
+
