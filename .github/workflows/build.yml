@@ -36,7 +36,7 @@ jobs:
     - name: Checkout Help
       uses: actions/checkout@v4
       with:
-        repoistory: 'PCL-Community/PCL2CEHelp'
+        repository: 'PCL-Community/PCL2CEHelp'
 
     - name: Checkout
       uses: actions/checkout@v4
