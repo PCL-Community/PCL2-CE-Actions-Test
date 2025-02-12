@@ -1,15 +1,11 @@
 name: Build
 
 on:
-  push:
-    paths:
-      - 'Plain Craft Launcher 2/**'
-      - '.github/workflows/**'
   pull_request:
-    paths:
-      - 'Plain Craft Launcher 2/**'
-      - '.github/workflows/**'
-  workflow_dispatch:
+    branches:
+      - beta
+    types:
+      - merged
 
 jobs:
   build:
@@ -74,7 +70,58 @@ jobs:
       run: msbuild "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -p:Configuration=${{ matrix.configuration }} -p:Platform=${{ matrix.architecture }}
 
     - name: Upload a Build Artifact
+      id: upload-artifact
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.configuration }}-${{ matrix.architecture }}
         path: Plain Craft Launcher 2\obj\${{ matrix.architecture }}\${{ matrix.configuration }}\Plain Craft Launcher 2.exe
+
+    - name: Create or Update Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.BOT }}
+      run: |
+        pr_number=${{ github.event.pull_request.number }}
+        response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+                         -H "Accept: application/vnd.github.v3+json" \
+                         https://api.github.com/repos/${{ github.repository }}/pulls/$pr_number)
+
+        pr_title=$(echo "$response" | jq -r '.title')
+        pr_body=$(echo "$response" | jq -r '.body')
+
+        tag_name="Beta ${pr_title}"
+
+        # Check if release already exists
+        existing_release=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+                                 -H "Accept: application/vnd.github.v3+json" \
+                                 https://api.github.com/repos/${{ github.repository }}/releases/tags/"$tag_name")
+
+        if [ "$(echo "$existing_release" | jq -r '.message')" != "Not Found" ]; then
+          # If release exists, update it
+          release_id=$(echo "$existing_release" | jq -r '.id')
+          curl -X PATCH -H "Authorization: token $GITHUB_TOKEN" \
+                       -H "Accept: application/vnd.github.v3+json" \
+                       -d "{\"tag_name\": \"$tag_name\", \"target_commitish\": \"beta\", \"name\": \"$pr_title\", \"body\": \"$pr_body\", \"draft\": false, \"prerelease\": true}" \
+                       https://api.github.com/repos/${{ github.repository }}/releases/$release_id
+        else
+          # If release does not exist, create a new one
+          curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
+                        -H "Accept: application/vnd.github.v3+json" \
+                        -d "{\"tag_name\": \"$tag_name\", \"target_commitish\": \"beta\", \"name\": \"$pr_title\", \"body\": \"$pr_body\", \"draft\": false, \"prerelease\": true}" \
+                        https://api.github.com/repos/${{ github.repository }}/releases
+        fi
+
+        # Upload artifacts to the release
+        release_id=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+                             -H "Accept: application/vnd.github.v3+json" \
+                             https://api.github.com/repos/${{ github.repository }}/releases/tags/"$tag_name" | jq -r '.id')
+
+        asset_path="${{ runner.temp }}/artifact.zip"
+        zip -j "$asset_path" Plain Craft Launcher 2\obj\${{ matrix.architecture }}\${{ matrix.configuration }}\Plain Craft Launcher 2.exe
+
+        curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
+                     -H "Content-Type: application/octet-stream" \
+                     --data-binary @"$asset_path" \
+                     "https://uploads.github.com/repos/${{ github.repository }}/releases/$release_id/assets?name=${{ matrix.configuration }}-${{ matrix.architecture }}.zip"
+
+
+
