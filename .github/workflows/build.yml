@@ -84,8 +84,23 @@ jobs:
         if (Test-Path "Plain Craft Launcher 2\bin") { Remove-Item -Recurse -Force "Plain Craft Launcher 2\bin" }
 
     - name: Build
-      run: msbuild "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -p:Configuration=${{ matrix.configuration }} -p:Platform=${{ matrix.architecture }}
-      retry: 3
+      shell: pwsh
+      run: |
+        $maxRetries = 3
+        $attempt = 0
+        $success = $false
+        while ($attempt -lt $maxRetries -and -not $success) {
+          try {
+            msbuild "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -p:Configuration=${{ matrix.configuration }} -p:Platform=${{ matrix.architecture }}
+            $success = $true
+          } catch {
+            $attempt++
+            Write-Host "Attempt $attempt failed. Retrying..."
+          }
+        }
+        if (-not $success) {
+          throw "Build failed after $maxRetries attempts."
+        }
 
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v4
