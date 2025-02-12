@@ -23,6 +23,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
+        ssh-key: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC6xkkmcmbHVvrc1m9zIbOARWyz5VsxEGV9EPb380XIxAlIi1tD+Ozt3VGzfx2/Q8+MZzgOaEGrO+NvVIqsJpy4q4TehRno8JPg9fSe1JIR5FHYHhGGFai0U3ePHS4KrpRwLnM2cbQQaCftZlhWxXdSJ2etUHL2gRD2QOgo51mtM4px01u13jkCtwP30D++oxbLtOH/nS9TrwbPtLPKlmc30kg+0RCPz0gpYzxmU8HWGaghUC1wjzOO+yS0Xww6i1/8Tzd6OUZGBNEzTyKqzesryAC+Sxwr/N6AA9XWvgtgY2NqeaU2oJOVcQBy6Y3M6qriXGJzNiytRjNo0z13Gxg2j4QCmiZD9RLtUWaKkmBzlS91Lg2FJ2KbDJZC39sy9zfnJPx0yFjXOMBE/N/GzPwnWV3ykjIvz25XjhuInEG5OAx4Q5H2dA4efWTg/FNXSG+QJA1zup92GZE7iefod0MIIuwUM6t9Vd8wqcu6Y5yH2hFlVWMD8TMJEcHbw4ilsE8= gbc034@outlook.com'
 
     - name: Set Describe
       shell: bash
@@ -41,7 +42,7 @@ jobs:
     - name: Update Help
       run:  |
         Set-Location ..
-        git clone https://github.com/PCL-Community/PCL2CEHelp.git -b master --single-branch --depth 1
+        git clone https://gitclone.com/github.com/PCL-Community/PCL2CEHelp.git -b master --single-branch --depth 1
         Set-Location PCL2CEHelp
         Remove-Item -Path *.* -Recurse -Force
         Compress-Archive -Path .\* -DestinationPath .\Help.zip
