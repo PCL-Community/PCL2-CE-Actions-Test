@@ -1,76 +1,48 @@
-name: Build
+name: Beta Build and Release
 
 on:
   push:
+    branches:
+      - beta
     paths:
       - 'Plain Craft Launcher 2/**'
       - '.github/workflows/**'
-  pull_request:
-    paths:
-      - 'Plain Craft Launcher 2/**'
-      - '.github/workflows/**'
-  workflow_dispatch:
 
 jobs:
-  build:
-    name: Build ${{ matrix.configuration }}-${{ matrix.architecture }} on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - configuration: Beta
-            architecture: x64
-            os: windows-latest
-          - configuration: Release
-            architecture: x64
-            os: windows-latest
-          - configuration: Beta
-            architecture: ARM64
-            os: self-hosted
-          - configuration: Release
-            architecture: ARM64
-            os: self-hosted
-      fail-fast: false
-
+  build-and-release:
+    name: Build and Release
+    runs-on: windows-latest
     steps:
     - name: Checkout
       uses: actions/checkout@v4
       with:
-        repository: 'PCL-Community/PCL2-CE'
+        fetch-depth: 0
 
     - name: Set Describe
+      shell: bash
       run: |
-          $describe = $(git describe --tags --always)
+          describe=`git describe --tags --always`
           echo "describe=$describe" >> $GITHUB_ENV
-
-    - name: Setup MSBuild.exe
-      uses: microsoft/setup-msbuild@v2
-      with:
-        msbuild-architecture: ${{ matrix.architecture }}
-
-#    - name: Restore NuGet Packages
-#      run: nuget restore "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -PackagesDirectory "packages"
-
-    - name: Update Help
-      run: |
-        dir
-        cd ..
-        dir
-        git clone https://github.com/PCL-Community/PCL2CEHelp.git -b master --single-branch --depth 1
-        dir
-        Set-Location PCL2CEHelp
-        dir
-        Remove-Item -Path *.* -Recurse -Force
-        dir
-        Compress-Archive -Path .\* -DestinationPath .\Help.zip
-        Copy-Item -Path .\Help.zip -Destination "..\PCL2-CE-Actions-Test\Plain Craft Launcher 2\Resources\Help.zip" -Force
-        dir
-        Set-Location ..\PCL2-CE-Actions-Test
 
     - name: Restore NuGet Packages
       run: nuget restore "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -PackagesDirectory "packages"
 
-    - name: Replace Secrets and Commit Hash
+    - name: Setup MSBuild.exe
+      uses: microsoft/setup-msbuild@v2
+      with:
+        msbuild-architecture: x64
+
+    - name: Update Help
+      run:  |
+        Set-Location ..
+        git clone https://github.com/PCL-Community/PCL2CEHelp.git -b master --single-branch --depth 1
+        Set-Location PCL2CEHelp
+        Remove-Item -Path *.* -Recurse -Force
+        Compress-Archive -Path .\* -DestinationPath .\Help.zip
+        Copy-Item -Path .\Help.zip -Destination "..\PCL2-CE\Plain Craft Launcher 2\Resources\Help.zip" -Force
+        Set-Location ..\PCL2-CE
+
+    - name: Replace
       run: |
         (gc "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public Const OAuthClientId As String = ""', 'Public Const OAuthClientId As String = "${{ secrets.CLIENT_ID }}"' | Out-File "Plain Craft Launcher 2\Modules\ModSecret.vb"
         (gc "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public Const CurseForgeAPIKey As String = ""', 'Public Const CurseForgeAPIKey As String = "${{ secrets.CURSEFORGE_API_KEY }}"' | Out-File "Plain Craft Launcher 2\Modules\ModSecret.vb"
@@ -79,10 +51,42 @@ jobs:
         (gc "Plain Craft Launcher 2\Pages\PageOther\PageOtherAbout.xaml") -replace 'https://github.com/PCL-Community/PCL2-CE', 'https://github.com/PCL-Community/PCL2-CE/tree/${{ github.sha }}' | Out-File "Plain Craft Launcher 2\Pages\PageOther\PageOtherAbout.xaml"
 
     - name: Build
-      run: msbuild "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -p:Configuration=${{ matrix.configuration }} -p:Platform=${{ matrix.architecture }}
+      run: msbuild "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -p:Configuration=Beta
 
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.configuration }}-${{ matrix.architecture }}-${{ env.describe }}
-        path: Plain Craft Launcher 2\obj\${{ matrix.configuration }}\${{ matrix.architecture }}\Plain Craft Launcher 2.exe
+        name: Beta ${{ env.describe }}
+        path: Plain Craft Launcher 2\obj\Beta\Plain Craft Launcher 2.exe
+
+    - name: Get latest merged PR title and body
+      id: get_pr_info
+      run: |
+        pr_title=$(gh api -H github.com /repos/PCL-Community/PCL2-CE/pulls?state=closed&sort=updated&direction=desc&base=beta | jq -r '.[0].title')
+        pr_body=$(gh api -H github.com /repos/PCL-Community/PCL2-CE/pulls?state=closed&sort=updated&direction=desc&base=beta | jq -r '.[0].body')
+        echo "::set-output name=title::$pr_title"
+        echo "::set-output name=body::$pr_body"
+      env:
+        GITHUB_TOKEN: ${{ secrets.BOT }}
+
+    - name: Create or update release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.BOT }}
+      with:
+        tag_name: Beta ${{ steps.get_pr_info.outputs.title }}
+        prerelease: true
+        name: ${{ steps.get_pr_info.outputs.title }}
+        body: ${{ steps.get_pr_info.outputs.body }}
+
+    - name: Upload Release Asset
+      id: upload-release-asset 
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.BOT }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: Plain Craft Launcher 2\obj\Beta\Plain Craft Launcher 2.exe
+        asset_name: Plain Craft Launcher 2.exe
+        asset_content_type: application/octet-stream
