@@ -5,7 +5,7 @@ on:
     branches:
       - beta
     types:
-      - closed
+      - merged
 
 jobs:
   build:
@@ -33,7 +33,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set Describe
-      shell: powershell
+      shell: pwsh
       run: |
           $describe = $(git describe --tags --always)
           echo "describe=$describe" >> $GITHUB_ENV
@@ -44,29 +44,33 @@ jobs:
         msbuild-architecture: ${{ matrix.architecture }}
 
     - name: Update Help
+      shell: pwsh
       run: |
         cd ..
         git clone https://gh.llkk.cc/https://github.com/PCL-Community/PCL2CEHelp -b master --single-branch --depth 1
         cd PCL2CEHelp
-        rm -Force -r *.*
+        Remove-Item *.* -Recurse -Force
         Compress-Archive -Path .\* -DestinationPath .\Help.zip
         Copy-Item -Path .\Help.zip -Destination "${{ github.workspace }}\Plain Craft Launcher 2\Resources\Help.zip" -Force
         cd ..
-        rm -Force -r .\PCL2CEHelp
+        Remove-Item .\PCL2CEHelp -Recurse -Force
         cd ${{ GITHUB.WORKSPACE }}
 
     - name: Restore NuGet Packages
+      shell: pwsh
       run: nuget restore "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -PackagesDirectory "packages"
 
     - name: Replace Secrets and Commit Hash
+      shell: pwsh
       run: |
-        (gc "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public Const OAuthClientId As String = ""', 'Public Const OAuthClientId As String = "${{ secrets.CLIENT_ID }}"' | Out-File "Plain Craft Launcher 2\Modules\ModSecret.vb"
-        (gc "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public Const CurseForgeAPIKey As String = ""', 'Public Const CurseForgeAPIKey As String = "${{ secrets.CURSEFORGE_API_KEY }}"' | Out-File "Plain Craft Launcher 2\Modules\ModSecret.vb"
-        (gc "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public Const LittleSkinClientId As String = ""', 'Public Const LittleSkinClientId As String = "${{ secrets.LITTLESKIN_CLIENT_ID }}"' | Out-File "Plain Craft Launcher 2\Modules\ModSecret.vb"
-        (gc "Plain Craft Launcher 2\Modules\Base\ModBase.vb") -replace 'Public Const CommitHash As String = "native"', 'Public Const CommitHash As String = "${{ github.sha }}"' | Out-File "Plain Craft Launcher 2\Modules\Base\ModBase.vb"
-        (gc "Plain Craft Launcher 2\Pages\PageOther\PageOtherAbout.xaml") -replace 'https://github.com/PCL-Community/PCL2-CE', 'https://github.com/PCL-Community/PCL2-CE/tree/${{ github.sha }}' | Out-File "Plain Craft Launcher 2\Pages\PageOther\PageOtherAbout.xaml"
+        (Get-Content "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public Const OAuthClientId As String = ""', 'Public Const OAuthClientId As String = "${{ secrets.CLIENT_ID }}"' | Set-Content "Plain Craft Launcher 2\Modules\ModSecret.vb"
+        (Get-Content "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public Const CurseForgeAPIKey As String = ""', 'Public Const CurseForgeAPIKey As String = "${{ secrets.CURSEFORGE_API_KEY }}"' | Set-Content "Plain Craft Launcher 2\Modules\ModSecret.vb"
+        (Get-Content "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public Const LittleSkinClientId As String = ""', 'Public Const LittleSkinClientId As String = "${{ secrets.LITTLESKIN_CLIENT_ID }}"' | Set-Content "Plain Craft Launcher 2\Modules\ModSecret.vb"
+        (Get-Content "Plain Craft Launcher 2\Modules\Base\ModBase.vb") -replace 'Public Const CommitHash As String = "native"', 'Public Const CommitHash As String = "${{ github.sha }}"' | Set-Content "Plain Craft Launcher 2\Modules\Base\ModBase.vb"
+        (Get-Content "Plain Craft Launcher 2\Pages\PageOther\PageOtherAbout.xaml") -replace 'https://github.com/PCL-Community/PCL2-CE', 'https://github.com/PCL-Community/PCL2-CE/tree/${{ github.sha }}' | Set-Content "Plain Craft Launcher 2\Pages\PageOther\PageOtherAbout.xaml"
 
     - name: Build
+      shell: pwsh
       run: msbuild "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -p:Configuration=${{ matrix.configuration }} -p:Platform=${{ matrix.architecture }}
 
     - name: Upload a Build Artifact
@@ -77,51 +81,67 @@ jobs:
         path: Plain Craft Launcher 2\obj\${{ matrix.architecture }}\${{ matrix.configuration }}\Plain Craft Launcher 2.exe
 
     - name: Create or Update Release
+      shell: pwsh
       env:
         GITHUB_TOKEN: ${{ secrets.BOT }}
       run: |
-        pr_number=${{ github.event.pull_request.number }}
-        response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-                         -H "Accept: application/vnd.github.v3+json" \
-                         https://api.github.com/repos/${{ github.repository }}/pulls/$pr_number)
+        $pr_number = $env:GITHUB_EVENT_PULL_REQUEST_NUMBER
+        $response = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/pulls/$pr_number" `
+                                      -Headers @{
+                                        Authorization = "token $env:GITHUB_TOKEN"
+                                        Accept = "application/vnd.github.v3+json"
+                                      }
 
-        pr_title=$(echo "$response" | jq -r '.title')
-        pr_body=$(echo "$response" | jq -r '.body')
+        $pr_title = $response.title
+        $pr_body = $response.body
 
-        tag_name="Beta ${pr_title}"
+        $tag_name = "Beta $($pr_title)"
 
         # Check if release already exists
-        existing_release=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-                                 -H "Accept: application/vnd.github.v3+json" \
-                                 https://api.github.com/repos/${{ github.repository }}/releases/tags/"$tag_name")
-
-        if [ "$(echo "$existing_release" | jq -r '.message')" != "Not Found" ]; then
+        try {
+          $existing_release = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases/tags/$([uri]::EscapeDataString($tag_name))" `
+                                               -Headers @{
+                                                 Authorization = "token $env:GITHUB_TOKEN"
+                                                 Accept = "application/vnd.github.v3+json"
+                                               }
           # If release exists, update it
-          release_id=$(echo "$existing_release" | jq -r '.id')
-          curl -X PATCH -H "Authorization: token $GITHUB_TOKEN" \
-                       -H "Accept: application/vnd.github.v3+json" \
-                       -d "{\"tag_name\": \"$tag_name\", \"target_commitish\": \"beta\", \"name\": \"$pr_title\", \"body\": \"$pr_body\", \"draft\": false, \"prerelease\": true}" \
-                       https://api.github.com/repos/${{ github.repository }}/releases/$release_id
-        else
+          $release_id = $existing_release.id
+          $update_response = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases/$release_id" `
+                                              -Method Patch `
+                                              -Body @{
+                                                tag_name = $tag_name
+                                                target_commitish = "beta"
+                                                name = $pr_title
+                                                body = $pr_body
+                                                draft = $false
+                                                prerelease = $true
+                                              } | ConvertTo-Json -Depth 100
+        } catch {
           # If release does not exist, create a new one
-          curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
-                        -H "Accept: application/vnd.github.v3+json" \
-                        -d "{\"tag_name\": \"$tag_name\", \"target_commitish\": \"beta\", \"name\": \"$pr_title\", \"body\": \"$pr_body\", \"draft\": false, \"prerelease\": true}" \
-                        https://api.github.com/repos/${{ github.repository }}/releases
-        fi
+          $create_response = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases" `
+                                              -Method Post `
+                                              -Body @{
+                                                tag_name = $tag_name
+                                                target_commitish = "beta"
+                                                name = $pr_title
+                                                body = $pr_body
+                                                draft = $false
+                                                prerelease = $true
+                                              } | ConvertTo-Json -Depth 100
+          $release_id = ($create_response | ConvertFrom-Json).id
+        }
 
         # Upload artifacts to the release
-        release_id=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-                             -H "Accept: application/vnd.github.v3+json" \
-                             https://api.github.com/repos/${{ github.repository }}/releases/tags/"$tag_name" | jq -r '.id')
+        $asset_path = "$env:RUNNER_TEMP/artifact.zip"
+        Compress-Archive -Path "Plain Craft Launcher 2\obj\${{ matrix.architecture }}\${{ matrix.configuration }}\Plain Craft Launcher 2.exe" -DestinationPath $asset_path -Force
 
-        asset_path="${{ runner.temp }}/artifact.zip"
-        zip -j "$asset_path" Plain Craft Launcher 2\obj\${{ matrix.architecture }}\${{ matrix.configuration }}\Plain Craft Launcher 2.exe
-
-        curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
-                     -H "Content-Type: application/octet-stream" \
-                     --data-binary @"$asset_path" \
-                     "https://uploads.github.com/repos/${{ github.repository }}/releases/$release_id/assets?name=${{ matrix.configuration }}-${{ matrix.architecture }}.zip"
+        $upload_uri = "https://uploads.github.com/repos/${{ github.repository }}/releases/$release_id/assets?name=${{ matrix.configuration }}-${{ matrix.architecture }}.zip"
+        $headers = @{
+          Authorization = "token $env:GITHUB_TOKEN"
+          "Content-Type" = "application/octet-stream"
+        }
+        $body = Get-Content -Path $asset_path -Raw -Encoding Byte
+        Invoke-RestMethod -Uri $upload_uri -Method Post -Headers $headers -InFile $asset_path
 
 
 
