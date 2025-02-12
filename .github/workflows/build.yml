@@ -54,11 +54,12 @@ jobs:
       with:
         msbuild-architecture: ${{ matrix.architecture }}
 
-    - name: Restore NuGet Packages
-      run: nuget restore "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -PackagesDirectory "packages"
+#    - name: Restore NuGet Packages
+#      run: nuget restore "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -PackagesDirectory "packages"
 
     - name: Update Help
       run: |
+        dir
         Set-Location ..
         Set-Location PCL2CEHelp
         Remove-Item -Path *.* -Recurse -Force
@@ -66,6 +67,9 @@ jobs:
         Copy-Item -Path .\Help.zip -Destination "..\PCL2-CE\Plain Craft Launcher 2\Resources\Help.zip" -Force
         Set-Location ..
         Set-Location PCL2-CE
+
+    - name: Restore NuGet Packages
+      run: nuget restore "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -PackagesDirectory "packages"
 
     - name: Replace Secrets and Commit Hash
       run: |
