@@ -33,21 +33,24 @@ jobs:
       fail-fast: false
 
     steps:
-    - name: Checkout Help
-      uses: actions/checkout@v4
-      with:
-        repository: 'PCL-Community/PCL2CEHelp'
-
     - name: Checkout
       uses: actions/checkout@v4
       with:
-        repository: 'PCL-Community/PCL2-CE'
+        fetch-depth: 0
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v2
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
 
     - name: Set Describe
-      shell: bash
+      shell: pwsh
       run: |
-          describe=`git describe --tags --always`
-          echo "describe=$describe" >> $GITHUB_ENV
+        $describe = git describe --tags --always
+        echo "describe=$describe" | Out-File -FilePath $env:GITHUB_ENV -Append
 
     - name: Setup MSBuild.exe
       uses: microsoft/setup-msbuild@v2
@@ -59,7 +62,9 @@ jobs:
 
     - name: Update Help
       run: |
-        Set-Location ..\PCL2CEHelp
+        Set-Location ..
+        git clone https://github.com/PCL-Community/PCL2CEHelp.git -b master --single-branch --depth 1
+        Set-Location PCL2CEHelp
         Remove-Item -Path *.* -Recurse -Force
         Compress-Archive -Path .\* -DestinationPath .\Help.zip
         Copy-Item -Path .\Help.zip -Destination "..\PCL2-CE\Plain Craft Launcher 2\Resources\Help.zip" -Force
@@ -73,8 +78,14 @@ jobs:
         (gc "Plain Craft Launcher 2\Modules\Base\ModBase.vb") -replace 'Public Const CommitHash As String = "native"', 'Public Const CommitHash As String = "${{ github.sha }}"' | Out-File "Plain Craft Launcher 2\Modules\Base\ModBase.vb"
         (gc "Plain Craft Launcher 2\Pages\PageOther\PageOtherAbout.xaml") -replace 'https://github.com/PCL-Community/PCL2-CE', 'https://github.com/PCL-Community/PCL2-CE/tree/${{ github.sha }}' | Out-File "Plain Craft Launcher 2\Pages\PageOther\PageOtherAbout.xaml"
 
+    - name: Clean
+      run: |
+        if (Test-Path "Plain Craft Launcher 2\obj") { Remove-Item -Recurse -Force "Plain Craft Launcher 2\obj" }
+        if (Test-Path "Plain Craft Launcher 2\bin") { Remove-Item -Recurse -Force "Plain Craft Launcher 2\bin" }
+
     - name: Build
       run: msbuild "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -p:Configuration=${{ matrix.configuration }} -p:Platform=${{ matrix.architecture }}
+      retry: 3
 
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v4
