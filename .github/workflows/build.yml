@@ -33,6 +33,11 @@ jobs:
       fail-fast: false
 
     steps:
+    - name: Checkout Help
+      uses: actions/checkout@v4
+      with:
+        repoistory: 'PCL-Community/PCL2CEHelp'
+
     - name: Checkout
       uses: actions/checkout@v4
       with:
@@ -41,6 +46,7 @@ jobs:
     - name: Set Describe
       shell: bash
       run: |
+          cd ../PCL
           describe=`git describe --tags --always`
           echo "describe=$describe" >> $GITHUB_ENV
 
@@ -55,7 +61,6 @@ jobs:
     - name: Update Help
       run: |
         Set-Location ..
-        git clone https://ghfast.top/https://github.com/PCL-Community/PCL2CEHelp.git -b master --single-branch --depth 1
         Set-Location PCL2CEHelp
         Remove-Item -Path *.* -Recurse -Force
         Compress-Archive -Path .\* -DestinationPath .\Help.zip
