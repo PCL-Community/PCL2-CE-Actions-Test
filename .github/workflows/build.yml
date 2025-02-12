@@ -53,12 +53,18 @@ jobs:
 
     - name: Update Help
       run: |
+        dir
         cd ..
+        dir
         git clone https://github.com/PCL-Community/PCL2CEHelp.git -b master --single-branch --depth 1
+        dir
         Set-Location PCL2CEHelp
+        dir
         Remove-Item -Path *.* -Recurse -Force
+        dir
         Compress-Archive -Path .\* -DestinationPath .\Help.zip
         Copy-Item -Path .\Help.zip -Destination "..\PCL2-CE\Plain Craft Launcher 2\Resources\Help.zip" -Force
+        dir
         Set-Location ..\PCL2-CE
 
     - name: Restore NuGet Packages
