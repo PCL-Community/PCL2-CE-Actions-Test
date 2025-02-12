@@ -59,11 +59,11 @@ jobs:
 
     - name: Update Help
       run: |
-        Set-Location ..\PCL2CEHelp
+        Set-Location \..\PCL2CEHelp
         Remove-Item -Path *.* -Recurse -Force
         Compress-Archive -Path .\* -DestinationPath .\Help.zip
         Copy-Item -Path .\Help.zip -Destination "..\PCL2-CE\Plain Craft Launcher 2\Resources\Help.zip" -Force
-        Set-Location ..\PCL2-CE
+        Set-Location \..\PCL2-CE
 
     - name: Replace Secrets and Commit Hash
       run: |
