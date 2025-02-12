@@ -40,6 +40,7 @@ jobs:
         Write-Host "PR Number: $env:GITHUB_EVENT_PULL_REQUEST_NUMBER"
         Write-Host "PR Merged: $env:GITHUB_EVENT_PULL_REQUEST_MERGED"
         Write-Host "Base Ref: $env:GITHUB_BASE_REF"
+        Write-Host "Repository: $env:GITHUB_REPOSITORY"
 
     - name: Set Describe
       shell: pwsh
@@ -97,6 +98,12 @@ jobs:
         # Debugging information
         Write-Host "GITHUB_REPOSITORY: $env:GITHUB_REPOSITORY"
         Write-Host "GITHUB_EVENT_PULL_REQUEST_NUMBER: $env:GITHUB_EVENT_PULL_REQUEST_NUMBER"
+
+        # Ensure PR number is set
+        if (-not $env:GITHUB_EVENT_PULL_REQUEST_NUMBER) {
+          Write-Error "GITHUB_EVENT_PULL_REQUEST_NUMBER is not set."
+          exit 1
+        }
 
         # Fetch the Pull Request details
         try {
