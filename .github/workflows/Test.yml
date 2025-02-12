@@ -5,7 +5,7 @@ on:
 
 jobs:
   test-runner:
-    runs-on: [self-hosted, WoA]
+    runs-on: [self-hosted]
     
     steps:
     - name: Simple echo test
