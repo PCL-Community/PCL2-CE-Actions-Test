@@ -1,0 +1,12 @@
+name: Test WoA Runner
+
+on:
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  test-runner:
+    runs-on: [self-hosted, WoA]
+    
+    steps:
+    - name: Simple echo test
+      run: echo "🎉 WoA runner is working!"
