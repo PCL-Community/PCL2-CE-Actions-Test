@@ -60,6 +60,7 @@ jobs:
     - name: Update Help
       run: |
         cd ..
+        cd ..
         dir
         Set-Location ..
         Set-Location PCL2CEHelp
