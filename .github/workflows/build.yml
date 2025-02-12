@@ -38,17 +38,6 @@ jobs:
       with:
         repository: 'PCL-Community/PCL2-CE'
 
-    - name: CD ..
-      run: cd ..
-
-    - name: Checkout Help
-      uses: actions/checkout@v4
-      with:
-        repository: 'PCL-Community/PCL2CEHelp'
-
-    - name: CD PCL
-      run: cd PCL2-CE-Actions-Test
-
     - name: Set Describe
       shell: bash
       run: |
@@ -66,13 +55,12 @@ jobs:
     - name: Update Help
       run: |
         cd ..
-        dir
+        git clone https://github.com/PCL-Community -b master --single-branch --depth 1
         Set-Location PCL2CEHelp
         Remove-Item -Path *.* -Recurse -Force
         Compress-Archive -Path .\* -DestinationPath .\Help.zip
         Copy-Item -Path .\Help.zip -Destination "..\PCL2-CE\Plain Craft Launcher 2\Resources\Help.zip" -Force
-        Set-Location ..
-        Set-Location PCL2-CE
+        Set-Location ..\PCL2-CE
 
     - name: Restore NuGet Packages
       run: nuget restore "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -PackagesDirectory "packages"
