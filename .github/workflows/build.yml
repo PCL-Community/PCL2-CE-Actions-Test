@@ -5,12 +5,13 @@ on:
     branches:
       - beta
     types:
-      - merged
+      - closed
 
 jobs:
   build:
     name: Build ${{ matrix.configuration }}-${{ matrix.architecture }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    if: github.event.pull_request.merged == true
     strategy:
       matrix:
         include:
@@ -31,6 +32,14 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+
+    - name: Debug Event Information
+      shell: pwsh
+      run: |
+        Write-Host "Event Name: $env:GITHUB_EVENT_NAME"
+        Write-Host "PR Number: $env:GITHUB_EVENT_PULL_REQUEST_NUMBER"
+        Write-Host "PR Merged: $env:GITHUB_EVENT_PULL_REQUEST_MERGED"
+        Write-Host "Base Ref: $env:GITHUB_BASE_REF"
 
     - name: Set Describe
       shell: pwsh
@@ -140,7 +149,6 @@ jobs:
           Authorization = "token $env:GITHUB_TOKEN"
           "Content-Type" = "application/octet-stream"
         }
-        $body = Get-Content -Path $asset_path -Raw -Encoding Byte
         Invoke-RestMethod -Uri $upload_uri -Method Post -Headers $headers -InFile $asset_path
 
 
