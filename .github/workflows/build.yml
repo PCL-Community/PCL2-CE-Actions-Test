@@ -97,7 +97,7 @@ jobs:
       id: extract_version
       run: |
         VERSION=$(git log -1 --pretty=format:"%s" | grep -oE '2\.[0-999]+\.[0-999]+')
-        if [ -z "$VERSION" ]; then
+        if' [ -z "$VERSION" ]; then
           echo "::error::未检测到有效的 2.x.x 版本号"
           exit 1
         fi
