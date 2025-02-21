@@ -1,4 +1,4 @@
-﻿<Application x:Class="Application"
+<Application x:Class="Application"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="clr-namespace:PCL"
@@ -8,7 +8,7 @@
     <Application.Resources>
         <ResourceDictionary>
             
-            <!-- 本地化 -->
+            <!-- 本地化6 -->
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="pack://application:,,,/Resources/Language/zh_CN.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/Resources/Language/zh_CN.xaml" />
