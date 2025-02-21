@@ -1,11 +1,17 @@
 name: Build
 
 on:
-  pull_request:
+  push:
     branches:
-      - beta
-    types:
-      - merged
+      - 'beta'
+    paths:
+      - 'Plain Craft Launcher 2/**'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - 'Plain Craft Launcher 2/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -17,13 +23,7 @@ jobs:
           - configuration: Beta
             architecture: x64
             os: windows-latest
-          - configuration: Release
-            architecture: x64
-            os: windows-latest
           - configuration: Beta
-            architecture: ARM64
-            os: self-hosted
-          - configuration: Release
             architecture: ARM64
             os: self-hosted
       fail-fast: false
@@ -32,116 +32,130 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
+    - name: Check commit message for version pattern
+      id: check_commit
+      shell: bash
+      run: |
+        commit_msg=$(git log -1 --pretty=%B $GITHUB_SHA)
+        if [[ $commit_msg =~ v2\.[0-999]+\.[0-999]+ ]]; then
+          echo "valid=true" >> $GITHUB_OUTPUT
+        else
+          echo "valid=false" >> $GITHUB_OUTPUT
+        fi
+
     - name: Set Describe
-      shell: pwsh
+      if: steps.check_commit.outputs.valid == 'true'
+      shell: powershell
       run: |
           $describe = $(git describe --tags --always)
           echo "describe=$describe" >> $GITHUB_ENV
 
     - name: Setup MSBuild.exe
+      if: steps.check_commit.outputs.valid == 'true'
       uses: microsoft/setup-msbuild@v2
       with:
         msbuild-architecture: ${{ matrix.architecture }}
 
     - name: Update Help
-      shell: pwsh
+      if: steps.check_commit.outputs.valid == 'true'
       run: |
         cd ..
-        git clone https://gh.llkk.cc/https://github.com/PCL-Community/PCL2CEHelp -b master --single-branch --depth 1
+        git clone https://github.com/PCL-Community/PCL2CEHelp -b master --single-branch --depth 1
         cd PCL2CEHelp
-        Remove-Item *.* -Recurse -Force
+        rm -Force -r *.*
         Compress-Archive -Path .\* -DestinationPath .\Help.zip
         Copy-Item -Path .\Help.zip -Destination "${{ github.workspace }}\Plain Craft Launcher 2\Resources\Help.zip" -Force
         cd ..
-        Remove-Item .\PCL2CEHelp -Recurse -Force
+        rm -Force -r .\PCL2CEHelp
         cd ${{ GITHUB.WORKSPACE }}
 
     - name: Restore NuGet Packages
-      shell: pwsh
+      if: steps.check_commit.outputs.valid == 'true'
       run: nuget restore "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -PackagesDirectory "packages"
 
     - name: Replace Secrets and Commit Hash
-      shell: pwsh
+      if: steps.check_commit.outputs.valid == 'true'
       run: |
-        (Get-Content "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public Const OAuthClientId As String = ""', 'Public Const OAuthClientId As String = "${{ secrets.CLIENT_ID }}"' | Set-Content "Plain Craft Launcher 2\Modules\ModSecret.vb"
-        (Get-Content "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public Const CurseForgeAPIKey As String = ""', 'Public Const CurseForgeAPIKey As String = "${{ secrets.CURSEFORGE_API_KEY }}"' | Set-Content "Plain Craft Launcher 2\Modules\ModSecret.vb"
-        (Get-Content "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public Const LittleSkinClientId As String = ""', 'Public Const LittleSkinClientId As String = "${{ secrets.LITTLESKIN_CLIENT_ID }}"' | Set-Content "Plain Craft Launcher 2\Modules\ModSecret.vb"
-        (Get-Content "Plain Craft Launcher 2\Modules\Base\ModBase.vb") -replace 'Public Const CommitHash As String = "native"', 'Public Const CommitHash As String = "${{ github.sha }}"' | Set-Content "Plain Craft Launcher 2\Modules\Base\ModBase.vb"
-        (Get-Content "Plain Craft Launcher 2\Pages\PageOther\PageOtherAbout.xaml") -replace 'https://github.com/PCL-Community/PCL2-CE', 'https://github.com/PCL-Community/PCL2-CE/tree/${{ github.sha }}' | Set-Content "Plain Craft Launcher 2\Pages\PageOther\PageOtherAbout.xaml"
+        (gc "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public Const OAuthClientId As String = ""', 'Public Const OAuthClientId As String = "${{ secrets.CLIENT_ID }}"' | Out-File "Plain Craft Launcher 2\Modules\ModSecret.vb"
+        (gc "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public Const CurseForgeAPIKey As String = ""', 'Public Const CurseForgeAPIKey As String = "${{ secrets.CURSEFORGE_API_KEY }}"' | Out-File "Plain Craft Launcher 2\Modules\ModSecret.vb"
+        (gc "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public Const LittleSkinClientId As String = ""', 'Public Const LittleSkinClientId As String = "${{ secrets.LITTLESKIN_CLIENT_ID }}"' | Out-File "Plain Craft Launcher 2\Modules\ModSecret.vb"
+        (gc "Plain Craft Launcher 2\Modules\Base\ModBase.vb") -replace 'Public Const CommitHash As String = "native"', 'Public Const CommitHash As String = "${{ github.sha }}"' | Out-File "Plain Craft Launcher 2\Modules\Base\ModBase.vb"
+        (gc "Plain Craft Launcher 2\Pages\PageOther\PageOtherAbout.xaml") -replace 'https://github.com/PCL-Community/PCL2-CE', 'https://github.com/PCL-Community/PCL2-CE/tree/${{ github.sha }}' | Out-File "Plain Craft Launcher 2\Pages\PageOther\PageOtherAbout.xaml"
 
     - name: Build
-      shell: pwsh
+      if: steps.check_commit.outputs.valid == 'true'
       run: msbuild "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -p:Configuration=${{ matrix.configuration }} -p:Platform=${{ matrix.architecture }}
 
     - name: Upload a Build Artifact
-      id: upload-artifact
+      if: steps.check_commit.outputs.valid == 'true'
       uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.configuration }}-${{ matrix.architecture }}
-        path: Plain Craft Launcher 2\obj\${{ matrix.architecture }}\${{ matrix.configuration }}\Plain Craft Launcher 2.exe
+    
+    # 版本号提取
+    - name: Extract version from commit
+      id: extract_version
+      run: |
+        VERSION=$(git log -1 --pretty=format:"%s" | grep -oE '2\.[0-999]+\.[0-999]+')
+        if [ -z "$VERSION" ]; then
+          echo "::error::未检测到有效的 2.x.x 版本号"
+          exit 1
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-    - name: Create or Update Release
-      shell: pwsh
+    # 创建Release
+    - name: Create GitHub Release
+      id: create_release
       env:
         GITHUB_TOKEN: ${{ secrets.BOT }}
       run: |
-        $pr_number = $env:GITHUB_EVENT_PULL_REQUEST_NUMBER
-        $response = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/pulls/$pr_number" `
-                                      -Headers @{
-                                        Authorization = "token $env:GITHUB_TOKEN"
-                                        Accept = "application/vnd.github.v3+json"
-                                      }
-
-        $pr_title = $response.title
-        $pr_body = $response.body
-
-        $tag_name = "Beta $($pr_title)"
-
-        # Check if release already exists
-        try {
-          $existing_release = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases/tags/$([uri]::EscapeDataString($tag_name))" `
-                                               -Headers @{
-                                                 Authorization = "token $env:GITHUB_TOKEN"
-                                                 Accept = "application/vnd.github.v3+json"
-                                               }
-          # If release exists, update it
-          $release_id = $existing_release.id
-          $update_response = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases/$release_id" `
-                                              -Method Patch `
-                                              -Body @{
-                                                tag_name = $tag_name
-                                                target_commitish = "beta"
-                                                name = $pr_title
-                                                body = $pr_body
-                                                draft = $false
-                                                prerelease = $true
-                                              } | ConvertTo-Json -Depth 100
-        } catch {
-          # If release does not exist, create a new one
-          $create_response = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases" `
-                                              -Method Post `
-                                              -Body @{
-                                                tag_name = $tag_name
-                                                target_commitish = "beta"
-                                                name = $pr_title
-                                                body = $pr_body
-                                                draft = $false
-                                                prerelease = $true
-                                              } | ConvertTo-Json -Depth 100
-          $release_id = ($create_response | ConvertFrom-Json).id
+        RELEASE_JSON=$(cat <<EOF
+        {
+          "tag_name": "${{ steps.extract_version.outputs.version }}",
+          "name": "${{ steps.extract_version.outputs.version }}",
+          "target_commitish": "beta",
+          "prerelease": true,
+          "discussion_category_name": "公告",
+          "body": "**Beta Release**\n\n- 基于提交：${{ github.sha }}\n- 构建时间：$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
         }
+        EOF
+        )
 
-        # Upload artifacts to the release
-        $asset_path = "$env:RUNNER_TEMP/artifact.zip"
-        Compress-Archive -Path "Plain Craft Launcher 2\obj\${{ matrix.architecture }}\${{ matrix.configuration }}\Plain Craft Launcher 2.exe" -DestinationPath $asset_path -Force
+        response=$(curl -sS -X POST \
+          -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          -H "Content-Type: application/json" \
+          -d "$RELEASE_JSON" \
+          https://api.github.com/repos/${{ github.repository }}/releases)
 
-        $upload_uri = "https://uploads.github.com/repos/${{ github.repository }}/releases/$release_id/assets?name=${{ matrix.configuration }}-${{ matrix.architecture }}.zip"
-        $headers = @{
-          Authorization = "token $env:GITHUB_TOKEN"
-          "Content-Type" = "application/octet-stream"
-        }
-        $body = Get-Content -Path $asset_path -Raw -Encoding Byte
-        Invoke-RestMethod -Uri $upload_uri -Method Post -Headers $headers -InFile $asset_path
+        # 错误处理
+        if echo "$response" | grep -q '"html_url"'; then
+          echo "::notice::Release 创建成功：$(echo $response | jq -r .html_url)"
+        else
+          echo "::error::Release 创建失败：$response"
+          exit 1
+        fi
 
+        # 提取上传URL并设置输出
+        UPLOAD_URL=$(echo "$response" | jq -r .upload_url | sed 's/{.*}//')
+        echo "upload_url=$UPLOAD_URL" >> $GITHUB_OUTPUT
 
+    # 下载构建产物
+    - name: Download Build Artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: release-package
+        path: release-assets
 
+    # 上传到GitHub Release
+    - name: Upload Release Assets
+      env:
+        GITHUB_TOKEN: ${{ secrets.BOT }}
+      run: |
+        for asset in release-assets/*; do
+          echo "⬆️ 正在上传 $asset..."
+          curl -sS -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Content-Type: $(file -b --mime-type "$asset")" \
+            --data-binary @"$asset" \
+            "${{ steps.create_release.outputs.upload_url }}?name=$(basename "$asset")"
+        done
+        echo "✅ 所有产物已上传至Release"
