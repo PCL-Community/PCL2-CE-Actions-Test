@@ -96,12 +96,12 @@ jobs:
     - name: Extract version from commit
       id: extract_version
       run: |
-        VERSION=$(git log -1 --pretty=format:"%s" | grep -oE '2\.[0-999]+\.[0-999]+')
-        if' [ -z "$VERSION" ]; then
-          echo "::error::未检测到有效的 2.x.x 版本号"
-          exit 1
-        fi
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        VERSION=$(git log -1 --pretty=format:"%s" | Select-String -Pattern '2\.[0-999]+\.[0-999]+' -AllMatches | ForEach-Object { $_.Matches.Value })
+        if (-not $VERSION) {
+            echo "::error::未检测到有效的 2.x.x 版本号"
+            exit 1
+}
+echo "version=$VERSION" >> $GITHUB_OUTPUT
 
     # 创建Release
     - name: Create GitHub Release
