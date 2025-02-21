@@ -8,7 +8,7 @@
     <Application.Resources>
         <ResourceDictionary>
             
-            <!-- 本地化6 -->
+            <!-- 本地化u6 -->
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="pack://application:,,,/Resources/Language/zh_CN.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/Resources/Language/zh_CN.xaml" />
