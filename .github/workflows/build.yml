@@ -36,11 +36,11 @@ jobs:
       id: check_commit
       shell: bash
       run: |
-        commit_msg=$(git log -1 --pretty=%B $GITHUB_SHA)
-        if [[ $commit_msg =~ v2\.[0-9]+\.[0-9]+ ]]; then
-          echo "valid=true" >> $GITHUB_OUTPUT
+        commit_msg=$(git log -1 --pretty=%B "$GITHUB_SHA")
+        if echo "$commit_msg" | grep -Eq 'v2\.[0-9]+\.[0-9]+'; then
+           echo "valid=true" >> "$GITHUB_OUTPUT"
         else
-          echo "valid=false" >> $GITHUB_OUTPUT
+           echo "valid=false" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Set Describe
