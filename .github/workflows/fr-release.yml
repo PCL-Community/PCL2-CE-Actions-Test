@@ -1,4 +1,4 @@
-name: fr-release
+name: Build
 
 on:
   workflow_dispatch:
@@ -27,7 +27,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
       with:
-        ref: beta
+        ref: beta  # 确保检出 beta 分支
 
     - name: Set Describe
       shell: powershell
@@ -76,13 +76,23 @@ jobs:
     name: Create Release
     needs: build
     runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          - configuration: Beta
+            architecture: x64
+          - configuration: Beta
+            architecture: ARM64
     steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
+    - name: Download artifacts
+      uses: actions/download-artifact@v3
       with:
         path: ./artifacts
+        pattern: ${{ matrix.configuration }}-${{ matrix.architecture }}
+        merge-multiple: true
 
     - name: Create Release
+      id: create_release
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.BOT }}
@@ -94,12 +104,12 @@ jobs:
         prerelease: true
         target_commitish: beta
 
-    - name: Upload Release Assets
+    - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.BOT }}
       with:
-        upload_url: ${{ steps.create-release.outputs.upload_url }}
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./artifacts/${{ matrix.configuration }}-${{ matrix.architecture }}/Plain Craft Launcher 2.exe
         asset_name: PlainCraftLauncher2-${{ github.event.inputs.version }}-${{ matrix.architecture }}.exe
         asset_content_type: application/octet-stream
