@@ -1,4 +1,4 @@
-name: Build
+name: fr-release
 
 on:
   workflow_dispatch:
