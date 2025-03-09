@@ -1,5 +1,4 @@
 name: semi-automatic-release-publish
-
 on:
   workflow_dispatch:
     inputs:
@@ -35,8 +34,10 @@ jobs:
       fail-fast: false
 
     steps:
-    - name: Checkout
+    - name: Checkout Source Code
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.ring_type == 'fast' && 'beta' || 'main' }}  # 新增分支切换逻辑
 
     - name: Determine configuration
       shell: bash
