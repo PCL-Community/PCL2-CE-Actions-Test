@@ -1,4 +1,5 @@
 name: semi-automatic-release-publish
+
 on:
   workflow_dispatch:
     inputs:
@@ -22,7 +23,7 @@ on:
 
 jobs:
   build:
-    name: Build ${{ inputs.ring_type == 'fast' && 'Beta' || 'Release' }}-${{ matrix.architecture }} on ${{ matrix.os }}
+    name: Build ${{ inputs.ring_type == 'fast' && 'Beta' || 'Release' }}-${{ matrix.architecture }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -37,9 +38,9 @@ jobs:
     - name: Checkout Source Code
       uses: actions/checkout@v4
       with:
-        ref: ${{ inputs.ring_type == 'fast' && 'beta' || 'main' }}  # 新增分支切换逻辑
+        ref: ${{ inputs.ring_type == 'fast' && 'beta' || 'main' }}  # 动态分支切换
 
-    - name: Determine configuration
+    - name: Determine Configuration
       shell: bash
       run: |
         echo "CONFIGURATION=${{ inputs.ring_type == 'fast' && 'Beta' || 'Release' }}" >> $GITHUB_ENV
@@ -47,57 +48,100 @@ jobs:
     - name: Set Describe
       shell: powershell
       run: |
-          $describe = $(git describe --tags --always)
-          echo "describe=$describe" >> $GITHUB_ENV
+        $describe = $(git describe --tags --always)
+        echo "describe=$describe" >> $GITHUB_ENV
 
-    - name: Setup MSBuild.exe
+    - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
       with:
         msbuild-architecture: ${{ matrix.architecture }}
 
-    - name: Update Help
+    - name: Update Help Docs
+      shell: powershell
       run: |
-        cd ..
-        git clone https://github.com/PCL-Community/PCL2CEHelp -b master --single-branch --depth 1
-        cd PCL2CEHelp
-        rm -Force -r *.*
-        Compress-Archive -Path .\* -DestinationPath .\Help.zip
-        Copy-Item -Path .\Help.zip -Destination "${{ github.workspace }}\Plain Craft Launcher 2\Resources\Help.zip" -Force
-        cd ..
-        rm -Force -r .\PCL2CEHelp
-        cd ${{ GITHUB.WORKSPACE }}
+        $helpPath = "${{ github.workspace }}\Plain Craft Launcher 2\Resources\Help.zip"
+        Remove-Item -Path $helpPath -Force -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Path "${{ github.workspace }}\_temp" -Force
+        cd "${{ github.workspace }}\_temp"
+        git clone https://github.com/PCL-Community/PCL2CEHelp -b master --depth 1
+        Compress-Archive -Path ".\PCL2CEHelp\*" -DestinationPath $helpPath
+        cd ${{ github.workspace }}
+        Remove-Item -Recurse -Force "${{ github.workspace }}\_temp"
 
     - name: Restore NuGet Packages
       run: nuget restore "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -PackagesDirectory "packages"
 
-    - name: Replace Secrets and Commit Hash
+    - name: Inject Secrets
+      shell: powershell
       run: |
-        (gc "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public Const OAuthClientId As String = ""', 'Public Const OAuthClientId As String = "${{ secrets.CLIENT_ID }}"' | Out-File "Plain Craft Launcher 2\Modules\ModSecret.vb"
-        (gc "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public Const CurseForgeAPIKey As String = ""', 'Public Const CurseForgeAPIKey As String = "${{ secrets.CURSEFORGE_API_KEY }}"' | Out-File "Plain Craft Launcher 2\Modules\ModSecret.vb"
-        (gc "Plain Craft Launcher 2\Modules\ModSecret.vb") -replace 'Public Const LittleSkinClientId As String = ""', 'Public Const LittleSkinClientId As String = "${{ secrets.LITTLESKIN_CLIENT_ID }}"' | Out-File "Plain Craft Launcher 2\Modules\ModSecret.vb"
-        (gc "Plain Craft Launcher 2\Modules\Base\ModBase.vb") -replace 'Public Const CommitHash As String = "native"', 'Public Const CommitHash As String = "${{ github.sha }}"' | Out-File "Plain Craft Launcher 2\Modules\Base\ModBase.vb"
-        (gc "Plain Craft Launcher 2\Pages\PageOther\PageOtherAbout.xaml") -replace 'https://github.com/PCL-Community/PCL2-CE', 'https://github.com/PCL-Community/PCL2-CE/tree/${{ github.sha }}' | Out-File "Plain Craft Launcher 2\Pages\PageOther\PageOtherAbout.xaml"
+        # 统一替换密钥和提交哈希
+        $secretFile = "Plain Craft Launcher 2\Modules\ModSecret.vb"
+        $baseFile = "Plain Craft Launcher 2\Modules\Base\ModBase.vb"
+        $aboutFile = "Plain Craft Launcher 2\Pages\PageOther\PageOtherAbout.xaml"
 
-    - name: Build
-      run: msbuild "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" -p:Configuration=${{ env.CONFIGURATION }} -p:Platform=${{ matrix.architecture }}
+        (Get-Content $secretFile) `
+          -replace 'Public Const OAuthClientId As String = ""', 'Public Const OAuthClientId As String = "${{ secrets.CLIENT_ID }}"' `
+          -replace 'Public Const CurseForgeAPIKey As String = ""', 'Public Const CurseForgeAPIKey As String = "${{ secrets.CURSEFORGE_API_KEY }}"' `
+          -replace 'Public Const LittleSkinClientId As String = ""', 'Public Const LittleSkinClientId As String = "${{ secrets.LITTLESKIN_CLIENT_ID }}"' |
+        Set-Content $secretFile
 
-    - name: Upload Build Artifact
+        (Get-Content $baseFile) `
+          -replace 'Public Const CommitHash As String = "native"', "Public Const CommitHash As String = '${{ github.sha }}'" |
+        Set-Content $baseFile
+
+        (Get-Content $aboutFile) `
+          -replace 'https://github.com/PCL-Community/PCL2-CE', "https://github.com/PCL-Community/PCL2-CE/tree/${{ github.sha }}" |
+        Set-Content $aboutFile
+
+    - name: Build Project
+      shell: powershell
+      run: |
+        $outputName = "PCL2-${{ env.CONFIGURATION }}-${{ matrix.architecture }}.exe"
+        msbuild "Plain Craft Launcher 2\Plain Craft Launcher 2.vbproj" `
+          -p:Configuration=${{ env.CONFIGURATION }} `
+          -p:Platform=${{ matrix.architecture }} `
+          -p:OutDir="bin\${{ matrix.architecture }}\" `
+          -p:AssemblyName=$outputName
+
+    - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.CONFIGURATION }}-${{ matrix.architecture }}
-        path: Plain Craft Launcher 2\obj\${{ matrix.architecture }}\${{ env.CONFIGURATION }}\Plain Craft Launcher 2.exe
+        name: build-${{ matrix.architecture }}
+        path: |
+          Plain Craft Launcher 2\bin\${{ matrix.architecture }}\*.exe
+          Plain Craft Launcher 2\bin\${{ matrix.architecture }}\*.pdb
+        retention-days: 1
+        if-no-files-found: error
 
   create-release:
-    name: Create Release
+    name: Publish Release
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download all artifacts
+      - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: build-*
 
-      - name: Create Release
+      - name: Verify Artifact Structure
+        run: |
+          echo "=== Artifact Directory Tree ==="
+          find artifacts -type f -print
+          echo "=============================="
+
+      - name: Generate Release Notes
+        shell: bash
+        run: |
+          RELEASE_BODY="${{ inputs.changelog }}"
+          if [ -z "$RELEASE_BODY" ]; then
+            RELEASE_BODY="开发人员忘写更新日志了！快去提醒 TA 吧！"
+          fi
+          echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
+          echo "$RELEASE_BODY" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.BOT }}
@@ -105,7 +149,8 @@ jobs:
           tag_name: ${{ inputs.version }}
           target_commitish: ${{ inputs.ring_type == 'fast' && 'beta' || 'main' }}
           name: ${{ inputs.version }}
-          body: ${{ inputs.changelog }}
+          body: ${{ env.RELEASE_BODY }}
           prerelease: ${{ inputs.ring_type == 'fast' }}
           files: |
             artifacts/**/*
+          draft: false
