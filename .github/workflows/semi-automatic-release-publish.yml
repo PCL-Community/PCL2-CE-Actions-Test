@@ -1,4 +1,4 @@
-name: Build
+name: semi-automatic-release-publish
 
 on:
   workflow_dispatch:
