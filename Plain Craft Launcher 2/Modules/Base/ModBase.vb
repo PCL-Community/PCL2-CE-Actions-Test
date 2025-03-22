@@ -17,9 +17,9 @@ Public Module ModBase
     Public Const VersionStandardCode As String = "2.10.4." & VersionCodeString '标准格式的四段式版本号
     Public Const CommitHash As String = "native" 'Commit Hash，由 GitHub Workflow 自动替换
     Public CommitHashShort As String = If(CommitHash = "native", "native", CommitHash.Substring(0, 7)) 'Commit Hash，取前 7 位
-    Public Const UpstreamVersion As String = "2.8.13" '上游版本
-    Public Const VersionCode As Integer = 362 '内部版本号
-    Public Const VersionCodeString As String = "362" '内部版本号的字符串形式
+    Public Const UpstreamVersion As String = "2.9.1" '上游版本
+    Public Const VersionCode As Integer = 363 '内部版本号
+    Public Const VersionCodeString As String = "363" '内部版本号的字符串形式
     '自动生成的版本信息
 #If RELEASE Then
     Public Const VersionBranchName As String = "Slow Ring"
@@ -3036,7 +3036,7 @@ Retry:
         OpenWebsite("https://github.com/PCL-Community/PCL2-CE/issues/")
     End Sub
     Public Function CanFeedback(ShowHint As Boolean) As Boolean
-        If LatestVersion <> VersionBaseName Then
+        If LatestVersionCode > VersionCode Then
             If ShowHint Then
                 If MyMsgBox($"你的 PCL 不是最新版，因此无法提交反馈。{vbCrLf}请在更新后，确认该问题在最新版中依然存在，然后再提交反馈。", "无法提交反馈", "更新", "取消") = 1 Then
                     UpdateCheckByButton()
