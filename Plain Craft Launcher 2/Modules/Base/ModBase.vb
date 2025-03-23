@@ -17,7 +17,7 @@ Public Module ModBase
     Public Const VersionStandardCode As String = "2.10.5." & VersionCodeString '标准格式的四段式版本号
     Public Const CommitHash As String = "native" 'Commit Hash，由 GitHub Workflow 自动替换
     Public CommitHashShort As String = If(CommitHash = "native", "native", CommitHash.Substring(0, 7)) 'Commit Hash，取前 7 位
-    Public Const UpstreamVersion As String = "2.9.1" '上游版本
+    Public Const UpstreamVersion As String = "2.9.2" '上游版本
     Public Const VersionCode As Integer = 364 '内部版本号
     Public Const VersionCodeString As String = "364" '内部版本号的字符串形式
     '自动生成的版本信息
@@ -2779,6 +2779,20 @@ Retry:
 #End Region
 
 #Region "UI"
+
+    Public Sub SetLaunchFont(Optional FontName As String = Nothing)
+        Try
+            Dim TargetFont As FontFamily
+            If FontName Is Nothing Then
+                TargetFont = New FontFamily(New Uri("pack://application:,,,/"), "./Resources/#PCL English, Segoe UI, Microsoft YaHei UI")
+            Else
+                TargetFont = New FontFamily($"{FontName}, Segoe UI, Microsoft YaHei UI")
+            End If
+            Application.Current.Resources("LaunchFontFamily") = TargetFont
+        Catch ex As Exception
+            Log(ex, "设置字体失败", LogLevel.Hint)
+        End Try
+    End Sub
 
     '边距改变
     ''' <summary>
