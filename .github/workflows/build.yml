@@ -153,4 +153,4 @@ jobs:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: release-assets/Plain Craft Launcher 2.exe
         asset_name: PlainCraftLauncher2-${{ steps.extract_version.outputs.version }}-${{ matrix.architecture }}.exe
-        asset_content_type: application/octet-stream
+        asset_content_type: application/octet-strea
